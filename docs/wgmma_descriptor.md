@@ -1,6 +1,14 @@
-# wgmma desc
+# wgmma descriptor
 
-当从共享内存中加载数据时，wgmma 需要设置一个 64 位的描述符用来描述数据在共享内存中的组织形式。
+当 wgmma 从共享内存中加载数据时，需要设置一个 64 位的矩阵描述符用来描述数据在共享内存中的组织形式。具体结构如下：
+
+<div align="center">
+    <img src="../assets/ptx/wgmma_desc/wgmma_desc.png" width="80%" height="auto" alt="desc"><br>
+    <small>matrix descriptor</small>
+</div>
+<br>
+
+cutlass 中对应的代码如下。
 
 ```cpp
   // Bitfield implementation avoids the need for shifts in assignment
@@ -30,17 +38,18 @@
 1. 共享内存的起始地址，16位。
 2. leading_byte_offset_，16位。
 3. stride_byte_offset_，16位。
-4. base_offset_ ，8位。
+4. base_offset_，8位。
 5. layout_type_，8位。
 
-其中 layout type 表示共享内存中的数据使用的是哪种 swizzle 方式。有 4 种可选，分别是 none，32B，64B 和 128B。
-leading_byte_offset_ 和 stride_byte_offset_ 简称 LBO 和 SBO，代表 swizzle pattern 在两个方向上的 offset。
+其中 layout type 表示共享内存中的数据使用的是哪种 swizzle 方式。有 4 种可选，分别是 none swizzle，32B swizzle，64B swizzle 和 128B swizzle。
 
-下面分别验证在 cutlass 中，不同配置下 desc 是怎么确定的。
+leading_byte_offset 和 stride_byte_offset 简称 LBO 和 SBO，代表 swizzle pattern 在主序方向和非主序方向上的 offset。
+
+下面分别说明在 cutlass 中，不同配置下 descriptor 是怎么确定的。
 
 ## K-Major
 
-cutlass 中提前确定了不同 swizzle 的 pattern layout。k-major如下：
+cutlass 中提前确定了不同 swizzle pattern 的 layout。k-major 如下。
 
 ```cpp
 // K-major GMMA layouts in units of bits
@@ -50,7 +59,7 @@ using Layout_K_SW64_Atom_Bits   = ComposedLayout<Swizzle<2,4,3>, smem_ptr_flag, 
 using Layout_K_SW128_Atom_Bits  = ComposedLayout<Swizzle<3,4,3>, smem_ptr_flag, Layout<Shape<_8,_1024>,Stride<_1024,_1>>>;
 ```
 
-这里的 shape 是以 bit 为单位，针对具体的数据类型会进行 recast。比如使用 half 时进行 recast 会得到：
+这里的 shape 是以 bit 为单位，针对具体的数据类型会进行 recast。比如使用 half 时进行 recast 会得到。
 
 ```cpp
 using Layout_K_INTER_Atom = decltype(upcast<sizeof_bits<Type>::value>(Layout_K_INTER_Atom_Bits{}));
@@ -64,7 +73,7 @@ Layout_K_SW64_Atom  = Sw<2,4,3> o smem_ptr[32b](unset) o (_8,_32):(_32,_1)
 Layout_K_SW128_Atom = Sw<3,4,3> o smem_ptr[32b](unset) o (_8,_64):(_64,_1)
 ```
 
-分别打印这 4 个layout如下：
+分别打印这 4 个 layout 如下。
 
 ### Layout_K_INTER_Atom
 
@@ -79,7 +88,7 @@ Layout_K_SW128_Atom = Sw<3,4,3> o smem_ptr[32b](unset) o (_8,_64):(_64,_1)
 - half：Layout: (_8,_8):(_8,_1)
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/Layout_K_INTER_Atom_half.png" width="32%" height="auto" alt="swizzle"><br>
+    <img src="../assets/ptx/wgmma_desc/Layout_K_INTER_Atom_half.png" width="28%" height="auto" alt="swizzle"><br>
     <small>Layout_K_INTER_Atom_half</small>
 </div>
 <br>
@@ -89,16 +98,16 @@ Layout_K_SW128_Atom = Sw<3,4,3> o smem_ptr[32b](unset) o (_8,_64):(_64,_1)
 - 128bit：Sw<1,0,3> o _0 o (_8,_2):(_2,_1)
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/Layout_K_SW32_Atom_128bit.png" width="10%" height="auto" alt="swizzle"><br>
-    <small>Layout_K_INTER_Atom_128bit</small>
+    <img src="../assets/ptx/wgmma_desc/Layout_K_SW32_Atom_128bit.png" width="8%" height="auto" alt="swizzle"><br>
+    <small>Layout_K_SW32_Atom_128bit</small>
 </div>
 <br>
 
 - half：Layout: Sw<1,3,3> o _0 o (_8,_16):(_16,_1)
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/Layout_K_SW32_Atom_half.png" width="50%" height="auto" alt="swizzle"><br>
-    <small>Layout_K_INTER_Atom_128bit</small>
+    <img src="../assets/ptx/wgmma_desc/Layout_K_SW32_Atom_half.png" width="45%" height="auto" alt="swizzle"><br>
+    <small>Layout_K_SW32_Atom_128bit</small>
 </div>
 <br>
 
@@ -107,16 +116,16 @@ Layout_K_SW128_Atom = Sw<3,4,3> o smem_ptr[32b](unset) o (_8,_64):(_64,_1)
 - 128bit：Layout: Sw<2,0,3> o _0 o (_8,_4):(_4,_1)
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/Layout_K_SW64_Atom_128bit.png" width="18%" height="auto" alt="swizzle"><br>
-    <small>Layout_K_INTER_Atom_128bit</small>
+    <img src="../assets/ptx/wgmma_desc/Layout_K_SW64_Atom_128bit.png" width="15%" height="auto" alt="swizzle"><br>
+    <small>Layout_K_SW64_Atom_128bit</small>
 </div>
 <br>
 
 - half：Layout: Sw<2,3,3> o _0 o (_8,_32):(_32,_1)
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/Layout_K_SW64_Atom_half.png" width="80%" height="auto" alt="swizzle"><br>
-    <small>Layout_K_INTER_Atom_128bit</small>
+    <img src="../assets/ptx/wgmma_desc/Layout_K_SW64_Atom_half.png" width="75%" height="auto" alt="swizzle"><br>
+    <small>Layout_K_SW64_Atom_128bit</small>
 </div>
 <br>
 
@@ -125,8 +134,8 @@ Layout_K_SW128_Atom = Sw<3,4,3> o smem_ptr[32b](unset) o (_8,_64):(_64,_1)
 - 128bit：Layout: Sw<3,0,3> o _0 o (_8,_8):(_8,_1)
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/Layout_K_SW128_Atom_128bit.png" width="30%" height="auto" alt="swizzle"><br>
-    <small>Layout_K_INTER_Atom_128bit</small>
+    <img src="../assets/ptx/wgmma_desc/Layout_K_SW128_Atom_128bit.png" width="25%" height="auto" alt="swizzle"><br>
+    <small>Layout_K_SW128_Atom_128bit</small>
 </div>
 <br>
 
@@ -134,15 +143,19 @@ Layout_K_SW128_Atom = Sw<3,4,3> o smem_ptr[32b](unset) o (_8,_64):(_64,_1)
 
 <div align="center">
     <img src="../assets/ptx/wgmma_desc/Layout_K_SW128_Atom_half.png" width="100%" height="auto" alt="swizzle"><br>
-    <small>Layout_K_INTER_Atom_128bit</small>
+    <small>Layout_K_SW128_Atom_128bit</small>
 </div>
 <br>
 
 ### tile_to_shape
 
-shared memory 的大小一般都比 swizzle pattern 大，因此需要使用 swizzle pattern 对整个 shared memory 进行 tiling。tiling 的方向可以根据需要选择列方向或行方向。
+在实际计算中，shared memory 的大小一般都比 swizzle pattern 大，因此需要使用 swizzle pattern 对整个 shared memory 进行 tiling。tiling 的方向可以根据需要选择列方向或行方向。
 
-以 128B swizzle 为例，在 half 数据类型下它的大小是 8×64。当使用它对 128×128 大小的 smem 进行 tiling 时，结果如下。
+以 128B swizzle 为例，在 half 数据类型下它的大小是 8×64。
+
+当使用它对 128×128 大小的 smem 进行按列方向 tiling 时，结果如下。
+
+图中把数据类型 recast 到了 uint128_t，并且只截取了前 17 行。可以看到 swizzle pattern 在列方向上是连续的。
 
 ```cpp
 auto sA = tile_to_shape(Layout_K_SW128_Atom{}, make_shape(128, 128), Step<_1, _2>{});
@@ -151,10 +164,12 @@ print_latex(sA1);print("\n");
 ```
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/128B_swizzle_k_12_tiling.png" width="60%" height="auto" alt="swizzle"><br>
-    <small>128B swizzle col-major tiling</small>
+    <img src="../assets/ptx/wgmma_desc/128B_swizzle_k_12_tiling.png" width="50%" height="auto" alt="swizzle"><br>
+    <small>k-major 128B swizzle column tiling</small>
 </div>
 <br>
+
+当使用它对 128×128 大小的 smem 进行按行方向 tiling 时，结果如下。可以看到 swizzle pattern 在行方向上是连续的。
 
 ```cpp
 auto sA = tile_to_shape(Layout_K_SW128_Atom{}, make_shape(128, 128), Step<_2, _1>{});
@@ -163,32 +178,28 @@ print_latex(sA1);print("\n");
 ```
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/128B_swizzle_k_21_tiling.png" width="60%" height="auto" alt="swizzle"><br>
-    <small>128B swizzle row-major tiling</small>
+    <img src="../assets/ptx/wgmma_desc/128B_swizzle_k_21_tiling.png" width="50%" height="auto" alt="swizzle"><br>
+    <small>k-major 128B swizzle row tiling</small>
 </div>
 <br>
 
 
 ### make_gemm_desc
 
-假设 shared memory 的大小是 128×64。使用的 wgmma op 是 `SM90_64x64x16_F16F16F16_SS<GMMA::Major::K, GMMA::Major::K>{}`。
+在知道了 swizzle pattern 是怎么 tiling 到 shared memory 后，就可以直接观察出 SBO 和 LBO 的大小了。
 
-因为 wgmma 只支持 64×N×16 的形状，所以单次计算加载的矩阵 A 和 B 的 K 都是 16，矩阵 A 的 M 是 64。
+不过 cutlass 中实现了一个 make_gemm_desc 函数来创建 wgmma 需要的描述符。在这个过程中会通过形状运算对不同的 swizzle pattern 计算 SBO 和 LBO。
 
 ```cpp
 TiledMMA tiled_mma = make_tiled_mma(SM90_64x64x16_F16F16F16_SS<GMMA::Major::K, GMMA::Major::K>{});
-
 Tensor sA = make_tensor(make_smem_ptr(smem.A.begin()), ASmemLayout{});
-
 ThrMMA thr_mma = mma.get_slice(threadIdx.x);
 Tensor tCsA = thr_mma.partition_A(sA);
-
 Tensor tCrA = thr_mma.make_fragment_A(tCsA);
 ```
+cutlass 中可以通过上面的方法使用 wgmma。make_gemm_desc 会在 make_fragment_A 时进行。
 
-make_gemm_desc 会在 make_fragment_A 时进行。
-
-cutlass 中 make_gemm_desc 的代码如下，首先会把原始的 tensor recast 为 128bit 的 tensor。
+cutlass 中 make_gemm_desc 的代码如下。首先会把原始的 tensor recast 为 128bit 的 tensor。
 
 根据 smem 的 swizzle 格式确定是哪种 layout 类型。根据 smem 的起始地址确定描述符的起始地址。base_offset 默认设为 0。这三个变量和 swizzle 的方式无关。最后会根据 MN-major 还是 K-major 确定不同 swizzle 方式的 LBO 和 SBO。
 
@@ -298,25 +309,25 @@ make_gmma_desc(Tensor<TEngine,TLayout> const& tensor)
 }
 ```
 
-下面先介绍 K-major 下不同 swizzle 的 LBO 和 SBO 的确定方式。
+下面以 A 矩阵为例介绍 K-major 下不同 swizzle 模式的 LBO 和 SBO 的确定方式。因为 wgmma 只支持 64×N×16 的形状，所以对于一个 M×K 大小的 A 矩阵来说，wgmma 单次计算的大小是 64×16。
 
-#### none swizzle
+### none swizzle
 
 假设 smem 的大小是 128×64，数据类型是 half。对于原始的 half tensor，128×64 的矩阵被 none swizzle 分块后得到的 layout 是 `Sw<0,4,3> o smem_ptr16b o ((_8,16),(_8,8)):((_8,_64),(_1,1024))`。
 
-然后与 wgmma 的 ALayout 进行组合运算，转换成 tv-layout。wgmma 的 LayoutA_TV 是 `(_128,(_64,_16)):(_0,(_1,_64))`。表示有 128 个线程，每个线程都会访问 (64,16) 大小的数据。
+然后与 wgmma 的 ALayout 进行组合运算，转换成 tv-layout。wgmma 的 LayoutA_TV 是 `(_128,(_64,_16)):(_0,(_1,_64))`。表示有 128 个线程。因为是访问共享内存，所以每个线程都会访问 (64,16) 大小的数据。
 
 组合后的结果是 `((_64,(_8,_2)),_2,_4):((_8,(_1,_1024)),_512,_2048)`。
 
-这个 layout 表示 128×64 的 smem，被 wgmma（64×16）在行方向上分了 2 块，在列方向上被分了 4 块，其中列方向的每一块大小是 16，在 none swizzle 下包含了 2 个 pattern。
+这个 layout 表示 128×64 的 smem，被 wgmma（64×16）在 M 维度上分了 2 块，在 K 维度上被分了 4 块，其中 K 维度上的每一块大小是 16，在 none swizzle 下包含了 2 个 pattern。
 
-然后创建每一块 tensor 的描述符。创建描述符的时候传进 make_gmma_desc 函数的是 `smem_ptr16b o (_64,(_8,_2)):(_8,(_1,_1024))`，也就是 1 块的 layout。不同块的描述符的区别主要是地址，后面会根据索引对地址计算 offset。
+然后创建每一块 tensor 的描述符。创建描述符的时候传进 make_gmma_desc 函数的是 `smem_ptr16b o (_64,(_8,_2)):(_8,(_1,_1024))`，也就是 1 块的 layout。不同块的描述符的区别主要是共享内存的地址，后面会根据索引对地址计算 offset。
 
-input tensor：`smem_ptr16b o (_64,(_8,_2)):(_8,(_1,_1024))` 经过 recast 为 128bit 后变成 `smem_ptr128b o (_64,(_1,_2)):(_1,(_1,_128))`。也就是原本的 8 个 half 变成了一个 128bit 元素。
+input tensor `smem_ptr16b o (_64,(_8,_2)):(_8,(_1,_1024))` 经过 recast 为 128bit 后变成 `smem_ptr128b o (_64,(_1,_2)):(_1,(_1,_128))`，也就是原本的 8 个 half 变成了一个 128bit 元素。
 
-在计算 LBO 和 SBO 时会先做一个 assert，因为 swizzle pattern 的行都是 8，所以第一个维度需要能被 8 整除。又因为 wgmma 的 K 在 half 类型 dense 数据下固定是 16，也就是两个 128bit，所以 tensor 的第二个维度必须是 2。
+在计算 LBO 和 SBO 时会先做一个 assert，因为 swizzle pattern 的行都是 8，所以 M 维度需要能被 8 整除。又因为 wgmma 的 K 在 half 类型 dense 数据下固定是 16，也就是两个 128bit，所以 tensor 的 K 维度必须是 2。
 
-然后进一步把 128bit tensor 分成 8×N 行和 2 块。这里的 8 应该是因为 swizzle pattern 是 8 行，2 是因为一个 128bit tensor 在列方向上包含 2 个元素。
+然后进一步把 128bit tensor 按照 8×2 的大小分块。这里的 8 应该是因为 swizzle pattern 是 8 行，2 是因为一个 128bit tensor 在列方向上包含 2 个元素。
 
 分完之后得到 `canonical_layout = ((_8,_8),(_2,_1)):((_1,_8),(_128,_0))`。
 
@@ -324,22 +335,22 @@ input tensor：`smem_ptr16b o (_64,(_8,_2)):(_8,(_1,_1024))` 经过 recast 为 1
 
 `stride_00 = stride<0,0>(canonical_layout) = 1`。因为是 none swizzle，128 bit 下大小是 8×1, 所以行之间的 stride 就是 1。
 
-`stride_10 = stride<1,0>(canonical_layout) = 128`。none swizzle 下，两列之间是不连续的，所以 stride = smem 的行数，也就是 128。如果是其他的 swizzle 模式，这里因为是连续的，所以 stride = 1。
+`stride_10 = stride<1,0>(canonical_layout) = 128`。none swizzle 下，两列之间是不连续的，所以 stride = smem 的行数，也就是 128。如果是其他的 k-major swizzle 模式，这里因为是连续的，所以 stride = 1。
 
 `stride_01 = stride<0,1>(canonical_layout) = 8`。这里是因为 none swizzle 的大小是 8×1, 64 行被分成了 8×8，所以外层的 stride 就是 8。对于其余的 swizzle pattern，`stride01 = 8 * swizzle bytes / 16`。
 
-最终
+最终可以得到
+
 - desc.bitfield.stride_byte_offset_  = stride_01 = 8。
 - desc.bitfield.leading_byte_offset_ = stride_10 = 128。
 
-
 none swizzle 对 128×64 smem 的 tiling 结果如下图所示，图片中已经被 recast 成了 128bit，而且只截取了前 16 行，完整的有 128 行。
 
-上面的计算过程是 cutlass 中程序化的流程。因为 lbo 是 swizzle pattern 在主序方向上的 offset，也就是 K 方向，sbo 是 swizzle pattern 在非主序方向上的 offset，也就是 M 方向。所以可以直接从图中看到 lbo = 128，sbo = 8。
+上面是 cutlass 中程序化的计算流程。其实可以根据 tiling 的结果直接看出来 SBO 和 LBO 的大小。因为 LBO 是 swizzle pattern 在主序方向上的 offset，这里就是 K 方向，SBO 是 swizzle pattern 在非主序方向上的 offset，这里就是 M 方向。所以可以直接从图中看到 SBO = 8，LBO = 128。
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/none_sw_desc.png" width="32%" height="auto" alt="swizzle"><br>
-    <small>none k-major swizzle tiling 128×64</small>
+    <img src="../assets/ptx/wgmma_desc/none_sw_desc.png" width="24%" height="auto" alt="swizzle"><br>
+    <small>k-major none swizzle tiling 128×64</small>
 </div>
 <br>
 
@@ -348,8 +359,8 @@ none swizzle 对 128×64 smem 的 tiling 结果如下图所示，图片中已经
 
 因为 wgmma 的计算大小是 64×16，所以 128×64 的 smem 被分为 2×4 块。块之间的 sbo 和 lbo 都相同，主要的区别是 smem 的地址不一样。
 
-第一块的起始地址就是 smem 的起始地址，为 0x0040。行方向第二块和第一块的起始地址差了 64，所以地址变成了 0x0080。列方向第二块和第一块相差了 256，所以地址变成了 0x0140。在实际计算的过程中，会根据块的位置对描述符中的地址进行修改。
-```log
+第一块的起始地址就是 smem 的起始地址，为 0x0040。列方向第二块和第一块的起始地址差了 64，所以地址变成了 0x0080。行方向第二块和第一块相差了 256，所以地址变成了 0x0140。在实际计算的过程中，会根据块的位置对描述符中的地址进行修改。
+```cpp
 GMMA::DescriptorIterator o (_1,_2,_4):(_0,_64,_256):
   GmmaDescriptor: 0x0000000800800040
   start_addr :  0x0040
@@ -407,7 +418,7 @@ GMMA::DescriptorIterator o (_1,_2,_4):(_0,_64,_256):
   layout_type:  0x0 (INTERLEAVE)
 ```
 
-#### 32B swizzle
+### 32B swizzle
 
 还是以 128×64 大小的 K-major half tensor 为例。32B swizzle k-major 的 layout 为 `Sw<1,4,3> o smem_ptr16b o (_8,_16):(_16,_1)`。
 
@@ -421,7 +432,7 @@ recast 为 128bit 后变成 `Sw<1,4,3>_smem_ptr128b o (_64,_2):(_2,_1)`。也就
 
 设置 layout_type 为 32B，起始地址为 smem 的地址，base_offset = 0。然后计算 LBO 和 SBO。
 
-把 uint128 tensor 按照 (8，2) 分块不难得到 `canonical_layout = ((_8,_8),(_2,_1)):((_2,_16),(_1,_0))`。
+把 uint128 tensor 按照 (8,2) 分块可以得到 `canonical_layout = ((_8,_8),(_2,_1)):((_2,_16),(_1,_0))`。
 
 stride_00 = 2。stride_10 = 1。stride_01 = 16。
 
@@ -431,19 +442,20 @@ stride_00 = 2。stride_10 = 1。stride_01 = 16。
 
 下图是 32B swizzle k-major 对 128×64 tiling 的结果。图中只截取的前 17 行。
 
-因为 lbo 是 swizzle pattern 在主序方向上的 offset，也就是 K 方向，sbo 是 swizzle pattern 在非主序方向上的 offset，也就是 M 方向。从图中也可以直接看到 sbo = 16，lbo = 1。
+因为 LBO 是 swizzle pattern 在主序方向上的 offset，也就是 K 方向，SBO 是 swizzle pattern 在非主序方向上的 offset，也就是 M 方向。从图中也可以直接看到 SBO = 16，LBO = 1。这里是因为 wgmma 的 K 维度大小固定是 16，也就是 2 个 128bit 大小。在 wgmma 的范围内 K 方向的 stride = 1。
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/32BSW_desc.png" width="32%" height="auto" alt="swizzle"><br>
-    <small>32B k-major swizzle tiling 128×64</small>
+    <img src="../assets/ptx/wgmma_desc/32BSW_desc.png" width="24%" height="auto" alt="swizzle"><br>
+    <small>k-major 32B swizzle tiling 128×64</small>
 </div>
 <br>
 
 
 下面是打印不同块上的描述符的结果。
-跟前面一样，因为 wgmma 的计算大小是 64×16，所以 128×64 的 smem 被分为 2×4 块。第一块的起始地址就是 smem 的起始地址，为 0x0040。行方向第二块和第一块的起始地址差了 64×2 = 128，所以地址变成了 0x00c0。列方向第二块和第一块相差了 128×2 = 256，所以地址变成了 0x0140。
 
-```log
+跟前面一样，因为 wgmma 的计算大小是 64×16，所以 128×64 的 smem 被分为 2×4 块。第一块的起始地址就是 smem 的起始地址，为 0x0040。列方向第二块和第一块的起始地址差了 64×2 = 128，所以地址变成了 0x00c0。行方向第二块和第一块相差了 128×2 = 256，所以地址变成了 0x0140。
+
+```cpp
 GMMA::DescriptorIterator o (_1,_2,_4):(_0,_128,_256):
   GmmaDescriptor: 0xc000001000010040
   start_addr :  0x0040
@@ -501,9 +513,9 @@ GMMA::DescriptorIterator o (_1,_2,_4):(_0,_128,_256):
   layout_type:  0x3 (B32)
 ```
 
-#### 64B swizzle
+### 64B swizzle
 
-还是以 128×64 大小的 K-major half tensor 为例。64B swizzle k-major 的 layout 为 `Sw<2,4,3> o smem_ptr16b o (_8,_32):(_32,_1)`。
+以 128×64 大小的 K-major half tensor 为例。64B swizzle k-major 的 layout 为 `Sw<2,4,3> o smem_ptr16b o (_8,_32):(_32,_1)`。
 
 因此整个 shared memory 被分成 `Sw<2,4,3> o smem_ptr16b o ((_8,_16),(_32,_2)):((_32,_256),(_1,_4096))`。
 
@@ -513,7 +525,7 @@ GMMA::DescriptorIterator o (_1,_2,_4):(_0,_128,_256):
 
 recast 为 128bit 后变成 `Sw<2,4,3>_smem_ptr128b o (_64,_2):(_4,_1)`。
 
-把 uint128 tensor按 (8，2) 进行分块，不难得到 `canonical_layout = ((_8,_8),(_2,_1)):((_4,_32),(_1,_0))`。
+把 uint128 tensor 按 (8,2) 进行分块得到 `canonical_layout = ((_8,_8),(_2,_1)):((_4,_32),(_1,_0))`。
 
 stride_00 = 4。stride_10 = 1。stride_01 = 32。
 
@@ -523,20 +535,20 @@ stride_00 = 4。stride_10 = 1。stride_01 = 32。
 
 下图是 64B swizzle k-major 对 128×64 tiling 的结果。图中只截取的前 16 行。
 
-因为 lbo 是 swizzle pattern 在主序方向上的 offset，也就是 K 方向，sbo 是 swizzle pattern 在非主序方向上的 offset，也就是 M 方向。从图中也可以直接看到 sbo = 32，lbo = 1。
+因为 LBO 是 swizzle pattern 在主序方向上的 offset，也就是 K 方向，SBO 是 swizzle pattern 在非主序方向上的 offset，也就是 M 方向。从图中也可以直接看到 SBO = 32，LBO = 1。
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/64BSW_desc.png" width="32%" height="auto" alt="swizzle"><br>
-    <small>64B k-major swizzle tiling 128×64</small>
+    <img src="../assets/ptx/wgmma_desc/64BSW_desc.png" width="24%" height="auto" alt="swizzle"><br>
+    <small>k-major 64B swizzle tiling 128×64</small>
 </div>
 <br>
 
 
 下面是打印不同块上的描述符的结果。
 
-因为 wgmma 的计算大小是 64×16，所以 128×64 的 smem 被分为 2×4 块。第一块的起始地址就是 smem 的起始地址，为 0x0040。行方向第二块和第一块的起始地址差了 64×4 = 256，所以地址变成了 0x0140。列方向第二块和第一块相差了 2，所以地址变成了 0x0042。
+因为 wgmma 的计算大小是 64×16，所以 128×64 的 smem 被分为 2×4 块。第一块的起始地址就是 smem 的起始地址，为 0x0040。列方向第二块和第一块的起始地址差了 64×4 = 256，所以地址变成了 0x0140。行方向第二块和第一块相差了 2，所以地址变成了 0x0042。
 
-```log
+```cpp
 GMMA::DescriptorIterator o (_1,_2,(_2,_2)):(_0,_256,(_2,_512)):
   GmmaDescriptor: 0x8000002000010040
   start_addr :  0x0040
@@ -594,9 +606,9 @@ GMMA::DescriptorIterator o (_1,_2,(_2,_2)):(_0,_256,(_2,_512)):
   layout_type:  0x2 (B64)
 ```
 
-#### 128B swizzle
+### 128B swizzle
 
-还是以 128×64 大小的 K-major half tensor 为例。128B swizzle k-major 的 layout 为 `Sw<3,4,3> o smem_ptr16b o (_8,_64):(_64,_1)`。
+以 128×64 大小的 K-major half tensor 为例。128B swizzle k-major 的 layout 为 `Sw<3,4,3> o smem_ptr16b o (_8,_64):(_64,_1)`。
 
 因此整个 shared memory 被分成 `Sw<3,4,3> o smem_ptr16b o ((_8,_16),(_64,_1)):((_64,_512),(_1,_0))`。
 
@@ -606,22 +618,23 @@ GMMA::DescriptorIterator o (_1,_2,(_2,_2)):(_0,_256,(_2,_512)):
 
 recast 为 128bit 后变成 `Sw<3,4,3>_smem_ptr128b o (_64,_2):(_8,_1)`。
 
-把 uint128 tensor 按 (8，2) 进行分块，得到 `canonical_layout = ((_8,_8),(_2,_1)):((_8,_64),(_1,_0))`。
+把 uint128 tensor 按 (8,2) 进行分块得到 `canonical_layout = ((_8,_8),(_2,_1)):((_8,_64),(_1,_0))`。
 
-stride_00 = 8。stride_10 = 1。stride_01 = 64。
+其中，stride_00 = 8。stride_10 = 1。stride_01 = 64。
 
 所以：
+
 - desc.bitfield.stride_byte_offset_  = stride_01 = 64。
 - desc.bitfield.leading_byte_offset_ = stride_10 = 1。
 
 
 下图是 128B swizzle k-major 对 128×64 tiling 的结果。图中只截取的前 16 行。
 
-因为 lbo 是 swizzle pattern 在主序方向上的 offset，也就是 K 方向，sbo 是 swizzle pattern 在非主序方向上的 offset，也就是 M 方向。从图中也可以直接看到 sbo = 64，lbo = 1。
+因为 LBO 是 swizzle pattern 在主序方向上的 offset，也就是 K 方向，sbo 是 swizzle pattern 在非主序方向上的 offset，也就是 M 方向。从图中也可以直接看到 SBO = 64，LBO = 1。这里 LBO = 1 是因为 wgmma 的 K 维度大小固定是 16，也就是 2 个 128bit 大小。在 wgmma 的范围内 K 方向的 stride = 1。
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/128BSW_desc.png" width="32%" height="auto" alt="swizzle"><br>
-    <small>128B k-major swizzle tiling 128×64</small>
+    <img src="../assets/ptx/wgmma_desc/128BSW_desc.png" width="24%" height="auto" alt="swizzle"><br>
+    <small>k-major 128B swizzle tiling 128×64</small>
 </div>
 <br>
 
@@ -630,9 +643,9 @@ stride_00 = 8。stride_10 = 1。stride_01 = 64。
 
 因为 wgmma 的计算大小是 64×16，所以 128×64 的 smem 被分为 2×4 块。
 
-第一块的起始地址就是 smem 的起始地址，为 0x0040。行方向第二块和第一块的起始地址差了 64×8 = 512，所以地址变成了 0x0240。列方向第二块和第一块相差了 2，所以地址变成了 0x0042。
+第一块的起始地址就是 smem 的起始地址，为 0x0040。列方向第二块和第一块的起始地址差了 64×8 = 512，所以地址变成了 0x0240。行方向第二块和第一块相差了 2，所以地址变成了 0x0042。
 
-```log
+```cpp
 GMMA::DescriptorIterator o (_1,_2,_4):(_0,_512,_2):
   GmmaDescriptor: 0x4000004000010040
   start_addr :  0x0040
@@ -723,34 +736,82 @@ Layout_K_SW128_Atom = Sw<3,4,3> o smem_ptr[32b](unset) o (_8,_64):(_64,_1)
 
 - 128bit： Layout: (_1,_8):(_1,_1)
 
+<div align="center">
+    <img src="../assets/ptx/wgmma_desc/Layout_MN_INTER_Atom_128bit.png" width="25%" height="auto" alt="swizzle"><br>
+    <small>Layout_MN_INTER_Atom_128bit</small>
+</div>
+<br>
+
 - half：Layout: (_8,_8):(_1,_8)
+
+<div align="center">
+    <img src="../assets/ptx/wgmma_desc/Layout_MN_INTER_Atom_half.png" width="25%" height="auto" alt="swizzle"><br>
+    <small>Layout_MN_INTER_Atom_half</small>
+</div>
+<br>
 
 ### Layout_MN_SW32_Atom
 
 - 128bit：Layout: Sw<1,0,3> o _0 o (_2,_8):(_1,_2)
 
+<div align="center">
+    <img src="../assets/ptx/wgmma_desc/Layout_MN_SW32_Atom_128bit.png" width="25%" height="auto" alt="swizzle"><br>
+    <small>Layout_MN_SW32_Atom_128bit</small>
+</div>
+<br>
+
 - half：Layout: Sw<1,3,3> o _0 o (_16,_8):(_1,_16)
 
-
+<div align="center">
+    <img src="../assets/ptx/wgmma_desc/Layout_MN_SW32_Atom_half.png" width="25%" height="auto" alt="swizzle"><br>
+    <small>Layout_MN_SW32_Atom_128bit</small>
+</div>
+<br>
 
 ### Layout_MN_SW64_Atom
 
 - 128bit：Layout: Sw<2,0,3> o _0 o (_4,_8):(_1,_4)
 
+<div align="center">
+    <img src="../assets/ptx/wgmma_desc/Layout_MN_SW64_Atom_128bit.png" width="25%" height="auto" alt="swizzle"><br>
+    <small>Layout_MN_SW64_Atom_128bit</small>
+</div>
+<br>
+
 - half：Layout: Sw<2,3,3> o _0 o (_32,_8):(_1,_32)
+
+<div align="center">
+    <img src="../assets/ptx/wgmma_desc/Layout_MN_SW64_Atom_half.png" width="16%" height="auto" alt="swizzle"><br>
+    <small>Layout_MN_SW64_Atom_128bit</small>
+</div>
+<br>
 
 ### Layout_MN_SW128_Atom
 
 - 128bit：Layout: Sw<3,0,3> o _0 o (_8,_8):(_1,_8)
 
+<div align="center">
+    <img src="../assets/ptx/wgmma_desc/Layout_MN_SW128_Atom_128bit.png" width="30%" height="auto" alt="swizzle"><br>
+    <small>Layout_MN_SW128_Atom_128bit</small>
+</div>
+<br>
+
 - half：Layout: Sw<3,3,3> o _0 o (_64,_8):(_1,_64)
+
+<div align="center">
+    <img src="../assets/ptx/wgmma_desc/Layout_MN_SW128_Atom_half.png" width="16%" height="auto" alt="swizzle"><br>
+    <small>Layout_MN_SW128_Atom_128bit</small>
+</div>
+<br>
 
 
 ### tile_to_shape
 
-shared memory 的大小一般都比 swizzle pattern 大，因此需要使用 swizzle pattern 对整个 shared memory 进行 tiling。tiling 的方向可以根据需要选择列方向或行方向。
+在实际计算中，shared memory 的大小一般都比 swizzle pattern 大，因此需要使用 swizzle pattern 对整个 shared memory 进行 tiling。tiling 的方向可以根据需要选择列方向或行方向。
 
-以 128B swizzle 为例，在 half 数据类型下它的大小是 64×8。当使用它对 128×16 大小的 smem 进行 tiling 时，结果如下。
+以 128B swizzle 为例，在 half 数据类型下它的大小是 64×8。当使用它对 128×16 大小的 smem 进行按列方向 tiling 时，结果如下。
+
+图中把数据类型 recast 到了 uint128_t。可以看到 swizzle pattern 在列方向上是连续的。
 
 ```cpp
 auto sA = tile_to_shape(Layout_MN_SW128_Atom{}, make_shape(128, 16), Step<_1, _2>{});
@@ -759,10 +820,12 @@ print_latex(sA1);print("\n");
 ```
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/128B_swizzle_mn_12_tiling.png" width="60%" height="auto" alt="swizzle"><br>
-    <small>128B swizzle col-major tiling</small>
+    <img src="../assets/ptx/wgmma_desc/128B_swizzle_mn_12_tiling.png" width="50%" height="auto" alt="swizzle"><br>
+    <small>mn-major 128B swizzle column tiling</small>
 </div>
 <br>
+
+当使用它对 128×16 大小的 smem 进行按行方向 tiling 时，结果如下。可以看到 swizzle pattern 在行方向上是连续的。
 
 ```cpp
 auto sA = tile_to_shape(Layout_MN_SW128_Atom{}, make_shape(128, 16), Step<_2, _1>{});
@@ -771,37 +834,26 @@ print_latex(sA1);print("\n");
 ```
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/128B_swizzle_mn_21_tiling.png" width="60%" height="auto" alt="swizzle"><br>
-    <small>128B swizzle row-major tiling</small>
+    <img src="../assets/ptx/wgmma_desc/128B_swizzle_mn_21_tiling.png" width="50%" height="auto" alt="swizzle"><br>
+    <small>mn-major 128B swizzle row tiling</small>
 </div>
 <br>
 
 
-
 ### make_gemm_desc
 
-假设 shared memory 的大小是 128×64。使用的 wgmma op 是 `SM90_64x64x16_F16F16F16_SS<GMMA::Major::MN, GMMA::Major::MN>{}`。
+在知道了 swizzle pattern 是怎么 tiling 到 shared memory 后，就可以直接观察出 SBO 和 LBO 的大小了。
 
-因为 wgmma 只支持 64×N×16 的形状，所以 K 都是 16，A 的 M = 64。
+不过 cutlass 中实现了一个 make_gemm_desc 函数来创建 wgmma 需要的描述符。在这个过程中会通过形状运算对不同的 swizzle pattern 计算 SBO 和 LBO。
 
-```cpp
-TiledMMA tiled_mma = make_tiled_mma(SM90_64x64x16_F16F16F16_SS<GMMA::Major::MN, GMMA::Major::MN>{});
+计算过程与 K-major 的 swizzle pattern 基本相同。
 
-Tensor sA = make_tensor(make_smem_ptr(smem.A.begin()), ASmemLayout{});
-
-ThrMMA thr_mma = mma.get_slice(threadIdx.x);
-Tensor tCsA = thr_mma.partition_A(sA);
-
-Tensor tCrA = thr_mma.make_fragment_A(tCsA);
-```
-
-make_gemm_desc 会在 make_fragment_A 时进行。make_gemm_desc 的代码如下：
 
 首先会把原始的 tensor recast 为 128bit 的 tensor。
 
 根据 smem 的 swizzle 格式确定是哪种 layout 类型。根据 smem 的起始地址确定描述符的起始地址。base_offset 默认设为 0。这三个变量和 swizzle 的方式无关。
 
-最后会根据 MN-major 还是 K-major 确定不同 swizzle 方式的 LBO 和 SBO。
+最后会根据 MN-major 确定不同 swizzle 方式的 LBO 和 SBO。
 
 ```cpp
 template <Major MajorMode, class TEngine, class TLayout>
@@ -909,7 +961,7 @@ make_gmma_desc(Tensor<TEngine,TLayout> const& tensor)
 }
 ```
 
-下面先介绍 MN-major 下不同 swizzle 的 LBO 和 SBO 的确定方式。
+下面以 A 矩阵为例介绍 MN-major 下不同 swizzle 模式的 LBO 和 SBO 的确定方式。因为 wgmma 只支持 64×N×16 的形状，所以对于一个 M×K 大小的 A 矩阵来说，wgmma 单次计算的大小是 64×16。
 
 ### none swizzle
 
@@ -919,13 +971,13 @@ make_gmma_desc(Tensor<TEngine,TLayout> const& tensor)
 
 组合后的结果是：`smem_ptr16b o (((_8,_8),(_8,_2)),_2,_4):(((_1,_64),(_8,_1024)),_512,_2048)`。
 
-这个 layout 表示 128×64 的 smem，被 wgmma（64×16）在行方向上分了 2 块，在列方向上被分了 4 块，其中行方向包含 8 个 pattern，列方向包含 2 个pattern。
+这个 layout 表示 128×64 的 smem，被 wgmma（64×16）在列方向上分了 2 块，在行方向上被分了 4 块，其中列方向包含 8 个 pattern，行方向包含 2 个pattern。
 
 然后创建每一块 tensor 的描述符。创建描述符的时候传进 make_gmma_desc 函数的是 `smem_ptr16b o ((_8,_8),(_8,_2)):((_1,_64),(_8,_1024))`，也就是 1 块的 layout。不同块的描述符的区别主要是地址，后面会根据索引对地址计算 offset。
 
 recast 为 128bit 后变成 `smem_ptr128b o ((_1,_8),(_8,_2)):((_1,_8),(_1,_128))`。也就是原本的 8 个 half 变成了一个 128bit 元素。
 
-然后进一步把 128bit tensor 按照 （W，8）进行分块。这里 W 就是 swizzle pattern 的宽度，none = 1，32B = 2，64B = 4，128B = 8。
+然后进一步把 128bit tensor 按照 （W,8）进行分块。这里 W 就是 swizzle pattern 的宽度，none = 1，32B = 2，64B = 4，128B = 8。
 
 分完之后得到 `canonical_layout = ((_1,_8),(_8,_2)):((_8,_8),(_1,_128))`。
 
@@ -939,27 +991,33 @@ stride_01 = stride<0,1>(canonical_layout) = 8。因为是 none swizzle，所以�
 
 stride_11 = stride<1,1>(canonical_layout) = 128。因为是 none swizzle，所以两列之间的 stride = 16 * 8 = 128。
 
-最终
+最终得到
 
 ```cpp
 desc.bitfield.stride_byte_offset_  = (LAYOUT_TYPE == LayoutType::INTERLEAVE) ? stride_01 : stride_11 = 8。
 desc.bitfield.leading_byte_offset_ = (LAYOUT_TYPE == LayoutType::INTERLEAVE) ? stride_11 : stride_01 = 128。
 ```
-不知道为什么这里 none swizzle 的 LBO 和 SBO 会反过来。
 
-直接从图中也可以看到
+需要注意的是，不知道为什么这里 none swizzle 的 LBO 和 SBO 是反过来的。
+
+下图是 MN-major none swizzle 对 128×64 大小的 smem tiling 的结果，图片的列数没有截全。
+
+直接从图中也可以看到。因为是 MN-major，所以在 M 方向上 swizzle pattern 之间的 offset 是 8。在 K 方向上的 offset 是 128。因为这里 SBO 和 LBO 是反的，所以 LBO = 128， SBO = 8。
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/mn_none_sw_desc.png" width="90%" height="auto" alt="swizzle"><br>
+    <img src="../assets/ptx/wgmma_desc/mn_none_sw_desc.png" width="80%" height="auto" alt="swizzle"><br>
     <small>mn-major none swizzle tiling 128×64</small>
 </div>
 <br>
 
 
-下面是打印不同块上的描述符的结果。一共有 2×4 块。可以看到主要的区别是 smem 的起始地址不一样。
+下面是打印不同块上的描述符的结果。
 
-第一块的起始地址就是 smem 的起始地址，为 0x0040。行方向第二块和第一块的起始地址差了 8×8 = 64，所以地址变成了 0x0080。列方向第二块和第一块相差了 16×16 = 256，所以地址变成了 0x0140。
-```log
+因为 wgmma 的计算大小是 64×16，所以 128×64 的 smem 被分为 2×4 块。
+
+可以看到主要的区别是 smem 的起始地址不一样。第一块的起始地址就是 smem 的起始地址，为 0x0040。列方向第二块和第一块的起始地址差了 8×8 = 64，所以地址变成了 0x0080。行方向第二块和第一块相差了 16×16 = 256，所以地址变成了 0x0140。
+
+```cpp
 GMMA::DescriptorIterator o (_1,_2,_4):(_0,_64,_256):
   GmmaDescriptor: 0x0000000800800040
   start_addr :  0x0040
@@ -1031,9 +1089,9 @@ recast 为 128bit 后变成 `Sw<1,4,3>_smem_ptr128b o ((_2,_4),(_8,_2)):((_1,_16
 
 设置 layout_type 为 32B，起始地址为 smem 的地址，base_offset = 0。然后计算 LBO 和 SBO。
 
-把 uint128 tensor 按（W，8）进行分块。这里 W 就是 swizzle pattern 的宽度，none = 1，32B = 2，64B = 4，128B = 8。
+把 uint128 tensor 按（W,8）进行分块。这里 W 就是 swizzle pattern 的宽度，none = 1，32B = 2，64B = 4，128B = 8。
 
-得到 `canonical_layout = ((_2,_4),(_8,_2)):((_1,_16),(_2,_128))`。等于没分块。
+得到 `canonical_layout = ((_2,_4),(_8,_2)):((_1,_16),(_2,_128))`。
 
 有了 `canonical_layout` 后就可以计算LBO和SBO了。
 
@@ -1045,25 +1103,29 @@ stride_01 = stride<0,1>(canonical_layout) = 16。因为是 32B swizzle，所以�
 
 stride_11 = stride<1,1>(canonical_layout) = 128。因为是 32B swizzle，所以两列之间的 stride = 16 * 8 = 128。
 
-最终
+最终得到
 
 ```cpp
 desc.bitfield.stride_byte_offset_  = (LAYOUT_TYPE == LayoutType::INTERLEAVE) ? stride_01 : stride_11 = 128。
 desc.bitfield.leading_byte_offset_ = (LAYOUT_TYPE == LayoutType::INTERLEAVE) ? stride_11 : stride_01 = 16。
 ```
 
-直接从图中也可以看到
+下图是 MN-major 32B swizzle 对 128×64 大小的 smem tiling 的结果，图片的列数没有截全。
+
+直接从图中也可以看到。因为是 MN-major，所以在 M 方向上 swizzle pattern 之间的 offset 是 16。在 K 方向上的 offset 是 128，所以 SBO = 128，LBO = 16。
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/mn_32BSW_desc.png" width="90%" height="auto" alt="swizzle"><br>
+    <img src="../assets/ptx/wgmma_desc/mn_32BSW_desc.png" width="80%" height="auto" alt="swizzle"><br>
     <small>mn-major 32B swizzle tiling 128×64</small>
 </div>
 <br>
 
 
-下面是打印不同块上的描述符的结果。一共有 2×4 块。第一块的起始地址就是 smem 的起始地址，为 0x0040。行方向第二块和第一块的起始地址差了 8×8 = 64，所以地址变成了 0x0080。列方向第二块和第一块相差了 16×16 = 256，所以地址变成了 0x0140。
+下面是打印不同块上的描述符的结果。
 
-```log
+因为 wgmma 的计算大小是 64×16，所以 128×64 的 smem 被分为 2×4 块。第一块的起始地址就是 smem 的起始地址，为 0x0040。列方向第二块和第一块的起始地址差了 8×8 = 64，所以地址变成了 0x0080。列方向第二块和第一块相差了 16×16 = 256，所以地址变成了 0x0140。
+
+```cpp
 GMMA::DescriptorIterator o (_1,_2,_4):(_0,_64,_256):
   GmmaDescriptor: 0xc000008000100040
   start_addr :  0x0040
@@ -1135,7 +1197,7 @@ recast 为 128bit 后变成 `Sw<2,4,3>_smem_ptr128b o ((_4,_2),(_8,_2)):((_1,_32
 
 设置 layout_type 为 64B，起始地址为 smem 的地址，base_offset = 0。然后计算 LBO 和 SBO。
 
-把 uint128 tensor 按（W，8）进行分块。这里 W 就是 swizzle pattern 的宽度，none = 1，32B = 2，64B = 4，128B = 8。
+把 uint128 tensor 按（W,8）进行分块。这里 W 就是 swizzle pattern 的宽度，none = 1，32B = 2，64B = 4，128B = 8。
 
 得到 `canonical_layout = ((_4,_2),(_8,_2)):((_1,_32),(_4,_128))`。
 
@@ -1149,26 +1211,28 @@ stride_01 = stride<0,1>(canonical_layout) = 32。因为是 64B swizzle，所以�
 
 stride_11 = stride<1,1>(canonical_layout) = 128。因为是 64B swizzle，所以两列之间的 stride = 16 * 8 = 128。
 
-最终
+最终得到
 
 ```cpp
 desc.bitfield.stride_byte_offset_  = (LAYOUT_TYPE == LayoutType::INTERLEAVE) ? stride_01 : stride_11 = 128。
 desc.bitfield.leading_byte_offset_ = (LAYOUT_TYPE == LayoutType::INTERLEAVE) ? stride_11 : stride_01 = 32。
 ```
 
-直接从图中也可以看到
+下图是 MN-major 64B swizzle 对 128×64 大小的 smem tiling 的结果，图片的列数没有截全。
+
+直接从图中也可以看到。因为是 MN-major，所以在 M 方向上 swizzle pattern 之间的 offset 是 32。在 K 方向上的 offset 是 128，所以 SBO = 128，LBO = 32。
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/mn_64BSW_desc.png" width="90%" height="auto" alt="swizzle"><br>
+    <img src="../assets/ptx/wgmma_desc/mn_64BSW_desc.png" width="80%" height="auto" alt="swizzle"><br>
     <small>mn-major 64B swizzle tiling 128×64</small>
 </div>
 <br>
 
+下面是打印不同块上的描述符的结果。
 
+因为 wgmma 的计算大小是 64×16，所以 128×64 的 smem 被分为 2×4 块。第一块的起始地址就是 smem 的起始地址，为 0x0040。列方向第二块和第一块的起始地址差了 8×8 = 64，所以地址变成了 0x0080。行方向第二块和第一块相差了 16×16 = 256，所以地址变成了 0x0140。
 
-下面是打印不同块上的描述符的结果。一共有 2×4 块。第一块的起始地址就是 smem 的起始地址，为 0x0040。行方向第二块和第一块的起始地址差了 8×8 = 64，所以地址变成了 0x0080。列方向第二块和第一块相差了 16×16 = 256，所以地址变成了 0x0140。
-
-```log
+```cpp
 GMMA::DescriptorIterator o (_1,_2,_4):(_0,_64,_256):
   GmmaDescriptor: 0x8000008000200040
   start_addr :  0x0040
@@ -1240,7 +1304,7 @@ recast 为 128bit 后变成 `Sw<3,4,3>_smem_ptr128b o (_8,(_8,_2)):(_1,(_8,_128)
 
 设置 layout_type 为 128B，起始地址为 smem 的地址，base_offset = 0。然后计算 LBO 和 SBO。
 
-把 uint128 tensor 按（W，8）进行分块。这里W就是 swizzle pattern 的宽度，none = 1，32B = 2，64B = 4，128B = 8。
+把 uint128 tensor 按（W,8）进行分块。这里W就是 swizzle pattern 的宽度，none = 1，32B = 2，64B = 4，128B = 8。
 
 得到 `canonical_layout = ((_8,_1),(_8,_2)):((_1,_0),(_8,_128))`。
 
@@ -1254,25 +1318,29 @@ stride_01 = stride<0,1>(canonical_layout) = 0。因为是 128B swizzle 的一个
 
 stride_11 = stride<1,1>(canonical_layout) = 128。因为是 64B swizzle，所以两列之间的 stride = 16 * 8 = 128。
 
-最终
+最终得到
 
 ```cpp
 desc.bitfield.stride_byte_offset_  = (LAYOUT_TYPE == LayoutType::INTERLEAVE) ? stride_01 : stride_11 = 128。
 desc.bitfield.leading_byte_offset_ = (LAYOUT_TYPE == LayoutType::INTERLEAVE) ? stride_11 : stride_01 = 0。
 ```
 
-直接从图中也可以看到
+下图是 MN-major 128B swizzle 对 128×64 大小的 smem tiling 的结果，图片的列数没有截全。
+
+直接从图中也可以看到。因为是 MN-major，所以在 M 方向上 swizzle pattern 之间的 offset 是 64，因为这里只重复一次，所以 LBO 可以随便设置，这里设置为 0。在 K 方向上的 offset 是 128，所以 SBO = 128，LBO = 0。
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/mn_128BSW_desc.png" width="90%" height="auto" alt="swizzle"><br>
+    <img src="../assets/ptx/wgmma_desc/mn_128BSW_desc.png" width="80%" height="auto" alt="swizzle"><br>
     <small>mn-major 128B swizzle tiling 128×64</small>
 </div>
 <br>
 
 
-下面是打印不同块上的描述符的结果。一共有 2×4 块。第一块的起始地址就是 smem 的起始地址，为 0x0040。行方向第二块和第一块的起始地址差了 8×8 = 64，所以地址变成了 0x0080。列方向第二块和第一块相差了 16×16 = 256，所以地址变成了 0x0140。
+下面是打印不同块上的描述符的结果。
 
-```log
+因为 wgmma 的计算大小是 64×16，所以 128×64 的 smem 被分为 2×4 块。第一块的起始地址就是 smem 的起始地址，为 0x0040。列方向第二块和第一块的起始地址差了 8×8 = 64，所以地址变成了 0x0080。行方向第二块和第一块相差了 16×16 = 256，所以地址变成了 0x0140。
+
+```cpp
 GMMA::DescriptorIterator o (_1,_2,_4):(_0,_64,_256):
   GmmaDescriptor: 0x4000008000000040
   start_addr :  0x0040
@@ -1330,7 +1398,79 @@ GMMA::DescriptorIterator o (_1,_2,_4):(_0,_64,_256):
   layout_type:  0x1 (B128)
 ```
 
-前面提到 swizzle pattern tiling smem 可以按照列主序或行主序。上面这么多全部是按照列主序 tiling 的，下面以 MN 128B swizzle 为例介绍如果是行主序 tiling 的话 LBO 和 SBO 怎么设置。
+前面提到 swizzle pattern tiling smem 可以按照列主序或行主序。上面全部是按照列主序 tiling 的，下面以 MN 128B swizzle 为例介绍如果是行主序 tiling 的话 LBO 和 SBO 怎么设置。
+
+下图是 MN-major 128B swizzle 按照行主序对 128×64 大小的 smem tiling 的结果。
+
+直接从图中可以看到。因为是 MN-major，所以在 M 方向上 swizzle pattern 之间的 offset 是 64。因为这里 wgmma 在 M 上的大小是 64，128B swizzle pattern 只重复一次，所以 LBO 可以随便设置，这里设置为 0。如果 wgmma 在 N 方向上使用的是更大的 shape，这里 LBO 就是 64。在 K 方向上的 offset 是 64，所以 SBO = 64。
+
+<div align="center">
+    <img src="../assets/ptx/wgmma_desc/128B_swizzle_mn_21_tiling.png" width="50%" height="auto" alt="swizzle"><br>
+    <small>mn-major 128B swizzle row tiling 128×64</small>
+</div>
+<br>
+
+下面是打印不同块上的描述符的结果。
+
+因为 wgmma 的计算大小是 64×16，所以 128×64 的 smem 被分为 2×4 块。第一块的起始地址就是 smem 的起始地址，为 0x0c48。列方向第二块和第一块的起始地址差了 8×8×8 = 512，所以地址变成了 0x0e48。行方向第二块和第一块相差了 8×8×2 = 128，所以地址变成了 0x0cc8。
+
+```cpp
+GMMA::DescriptorIterator o (_1,_2,_4):(_0,_512,_128):
+  GmmaDescriptor: 0x4000004000000c48
+  start_addr :  0x0c48
+  leading_off:  0x0000 (0)
+  stride_off :  0x0040 (64)
+  base_offset:  0x0
+  layout_type:  0x1 (B128)
+  GmmaDescriptor: 0x4000004000000e48
+  start_addr :  0x0e48
+  leading_off:  0x0000 (0)
+  stride_off :  0x0040 (64)
+  base_offset:  0x0
+  layout_type:  0x1 (B128)
+
+----------
+  GmmaDescriptor: 0x4000004000000cc8
+  start_addr :  0x0cc8
+  leading_off:  0x0000 (0)
+  stride_off :  0x0040 (64)
+  base_offset:  0x0
+  layout_type:  0x1 (B128)
+  GmmaDescriptor: 0x4000004000000ec8
+  start_addr :  0x0ec8
+  leading_off:  0x0000 (0)
+  stride_off :  0x0040 (64)
+  base_offset:  0x0
+  layout_type:  0x1 (B128)
+
+----------
+  GmmaDescriptor: 0x4000004000000d48
+  start_addr :  0x0d48
+  leading_off:  0x0000 (0)
+  stride_off :  0x0040 (64)
+  base_offset:  0x0
+  layout_type:  0x1 (B128)
+  GmmaDescriptor: 0x4000004000000f48
+  start_addr :  0x0f48
+  leading_off:  0x0000 (0)
+  stride_off :  0x0040 (64)
+  base_offset:  0x0
+  layout_type:  0x1 (B128)
+
+----------
+  GmmaDescriptor: 0x4000004000000dc8
+  start_addr :  0x0dc8
+  leading_off:  0x0000 (0)
+  stride_off :  0x0040 (64)
+  base_offset:  0x0
+  layout_type:  0x1 (B128)
+  GmmaDescriptor: 0x4000004000000fc8
+  start_addr :  0x0fc8
+  leading_off:  0x0000 (0)
+  stride_off :  0x0040 (64)
+  base_offset:  0x0
+  layout_type:  0x1 (B128)
+```
 
 
 
