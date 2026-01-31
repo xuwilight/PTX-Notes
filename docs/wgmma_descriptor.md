@@ -43,7 +43,7 @@ cutlass 中对应的代码如下。
 
 其中 layout type 表示共享内存中的数据使用的是哪种 swizzle 方式。有 4 种可选，分别是 none swizzle，32B swizzle，64B swizzle 和 128B swizzle。
 
-leading_byte_offset 和 stride_byte_offset 简称 LBO 和 SBO，代表 swizzle pattern 在主序方向和非主序方向上的 offset。
+leading_byte_offset 和 stride_byte_offset 简称 LBO 和 SBO，代表 swizzle pattern 在 wgmma 计算范围内的主序方向和非主序方向上的 offset。
 
 下面分别说明在 cutlass 中，不同配置下 descriptor 是怎么确定的。
 
@@ -107,7 +107,7 @@ Layout_K_SW128_Atom = Sw<3,4,3> o smem_ptr[32b](unset) o (_8,_64):(_64,_1)
 
 <div align="center">
     <img src="../assets/ptx/wgmma_desc/Layout_K_SW32_Atom_half.png" width="45%" height="auto" alt="swizzle"><br>
-    <small>Layout_K_SW32_Atom_128bit</small>
+    <small>Layout_K_SW32_Atom_half</small>
 </div>
 <br>
 
@@ -125,7 +125,7 @@ Layout_K_SW128_Atom = Sw<3,4,3> o smem_ptr[32b](unset) o (_8,_64):(_64,_1)
 
 <div align="center">
     <img src="../assets/ptx/wgmma_desc/Layout_K_SW64_Atom_half.png" width="75%" height="auto" alt="swizzle"><br>
-    <small>Layout_K_SW64_Atom_128bit</small>
+    <small>Layout_K_SW64_Atom_half</small>
 </div>
 <br>
 
@@ -143,7 +143,7 @@ Layout_K_SW128_Atom = Sw<3,4,3> o smem_ptr[32b](unset) o (_8,_64):(_64,_1)
 
 <div align="center">
     <img src="../assets/ptx/wgmma_desc/Layout_K_SW128_Atom_half.png" width="100%" height="auto" alt="swizzle"><br>
-    <small>Layout_K_SW128_Atom_128bit</small>
+    <small>Layout_K_SW128_Atom_half</small>
 </div>
 <br>
 
@@ -630,7 +630,7 @@ recast 为 128bit 后变成 `Sw<3,4,3>_smem_ptr128b o (_64,_2):(_8,_1)`。
 
 下图是 128B swizzle k-major 对 128×64 tiling 的结果。图中只截取的前 16 行。
 
-因为 LBO 是 swizzle pattern 在主序方向上的 offset，也就是 K 方向，sbo 是 swizzle pattern 在非主序方向上的 offset，也就是 M 方向。从图中也可以直接看到 SBO = 64，LBO = 1。这里 LBO = 1 是因为 wgmma 的 K 维度大小固定是 16，也就是 2 个 128bit 大小。在 wgmma 的范围内 K 方向的 stride = 1。
+因为 LBO 是 swizzle pattern 在主序方向上的 offset，也就是 K 方向，SBO 是 swizzle pattern 在非主序方向上的 offset，也就是 M 方向。从图中也可以直接看到 SBO = 64，LBO = 1。这里 LBO = 1 是因为 wgmma 的 K 维度大小固定是 16，也就是 2 个 128bit 大小。在 wgmma 的范围内 K 方向的 stride = 1。
 
 <div align="center">
     <img src="../assets/ptx/wgmma_desc/128BSW_desc.png" width="24%" height="auto" alt="swizzle"><br>
@@ -764,7 +764,7 @@ Layout_K_SW128_Atom = Sw<3,4,3> o smem_ptr[32b](unset) o (_8,_64):(_64,_1)
 
 <div align="center">
     <img src="../assets/ptx/wgmma_desc/Layout_MN_SW32_Atom_half.png" width="25%" height="auto" alt="swizzle"><br>
-    <small>Layout_MN_SW32_Atom_128bit</small>
+    <small>Layout_MN_SW32_Atom_half</small>
 </div>
 <br>
 
@@ -782,7 +782,7 @@ Layout_K_SW128_Atom = Sw<3,4,3> o smem_ptr[32b](unset) o (_8,_64):(_64,_1)
 
 <div align="center">
     <img src="../assets/ptx/wgmma_desc/Layout_MN_SW64_Atom_half.png" width="16%" height="auto" alt="swizzle"><br>
-    <small>Layout_MN_SW64_Atom_128bit</small>
+    <small>Layout_MN_SW64_Atom_half</small>
 </div>
 <br>
 
@@ -800,7 +800,7 @@ Layout_K_SW128_Atom = Sw<3,4,3> o smem_ptr[32b](unset) o (_8,_64):(_64,_1)
 
 <div align="center">
     <img src="../assets/ptx/wgmma_desc/Layout_MN_SW128_Atom_half.png" width="16%" height="auto" alt="swizzle"><br>
-    <small>Layout_MN_SW128_Atom_128bit</small>
+    <small>Layout_MN_SW128_Atom_half</small>
 </div>
 <br>
 
