@@ -1400,12 +1400,12 @@ GMMA::DescriptorIterator o (_1,_2,_4):(_0,_64,_256):
 
 前面提到 swizzle pattern tiling smem 可以按照列主序或行主序。上面全部是按照列主序 tiling 的，下面以 MN 128B swizzle 为例介绍如果是行主序 tiling 的话 LBO 和 SBO 怎么设置。
 
-下图是 MN-major 128B swizzle 按照行主序对 128×64 大小的 smem tiling 的结果。
+下图是 MN-major 128B swizzle 按照行主序对 128×64 大小的 smem tiling 的结果，图中只截取了前 32 列。
 
 直接从图中可以看到。因为是 MN-major，所以在 M 方向上 swizzle pattern 之间的 offset 是 64。因为这里 wgmma 在 M 上的大小是 64，128B swizzle pattern 只重复一次，所以 LBO 可以随便设置，这里设置为 0。如果 wgmma 在 N 方向上使用的是更大的 shape，这里 LBO 就是 512。在 K 方向上的 offset 是 64，所以 SBO = 64。
 
 <div align="center">
-    <img src="../assets/ptx/wgmma_desc/128B_swizzle_mn_21_tiling.png" width="50%" height="auto" alt="swizzle"><br>
+    <img src="../assets/ptx/wgmma_desc/mn_128BSW_desc_21.png" width="90%" height="auto" alt="swizzle"><br>
     <small>mn-major 128B swizzle row tiling 128×64</small>
 </div>
 <br>
