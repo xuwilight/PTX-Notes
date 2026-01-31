@@ -1402,7 +1402,7 @@ GMMA::DescriptorIterator o (_1,_2,_4):(_0,_64,_256):
 
 下图是 MN-major 128B swizzle 按照行主序对 128×64 大小的 smem tiling 的结果。
 
-直接从图中可以看到。因为是 MN-major，所以在 M 方向上 swizzle pattern 之间的 offset 是 64。因为这里 wgmma 在 M 上的大小是 64，128B swizzle pattern 只重复一次，所以 LBO 可以随便设置，这里设置为 0。如果 wgmma 在 N 方向上使用的是更大的 shape，这里 LBO 就是 64。在 K 方向上的 offset 是 64，所以 SBO = 64。
+直接从图中可以看到。因为是 MN-major，所以在 M 方向上 swizzle pattern 之间的 offset 是 64。因为这里 wgmma 在 M 上的大小是 64，128B swizzle pattern 只重复一次，所以 LBO 可以随便设置，这里设置为 0。如果 wgmma 在 N 方向上使用的是更大的 shape，这里 LBO 就是 512。在 K 方向上的 offset 是 64，所以 SBO = 64。
 
 <div align="center">
     <img src="../assets/ptx/wgmma_desc/128B_swizzle_mn_21_tiling.png" width="50%" height="auto" alt="swizzle"><br>
